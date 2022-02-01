@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"net"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -59,6 +58,8 @@ type Lease struct {
 	//The next binding state statement indicates what state the lease will move to when the current state expires. The time when the current state expires is specified in the ends statement.
 	NextBindingState string `json:"next-binding-state"`
 
+	RewindBindingState string `json:"rewind-binding-state"`
+
 	//The hardware statement records the MAC address of the network interface on which the lease will be used. It is specified as a series of hexadecimal octets, separated by colons.
 	Hardware struct {
 		Hardware string           `json:"hardware"`
@@ -74,20 +75,20 @@ type Lease struct {
 }
 
 var (
-	decoders = map[*regexp.Regexp]func(*Lease, string){
-		regexp.MustCompile("(.*) {"):                           func(l *Lease, line string) { l.IP = net.ParseIP(line) },
-		regexp.MustCompile("cltt (?P<D>.*);"):                  func(l *Lease, line string) { l.Cltt = parseTime(line) },
-		regexp.MustCompile("starts (?P<D>.*);"):                func(l *Lease, line string) { l.Starts = parseTime(line) },
-		regexp.MustCompile("ends (?P<D>.*);"):                  func(l *Lease, line string) { l.Ends = parseTime(line) },
-		regexp.MustCompile("tsfp (?P<D>.*);"):                  func(l *Lease, line string) { l.Tsfp = parseTime(line) },
-		regexp.MustCompile("tstp (?P<D>.*);"):                  func(l *Lease, line string) { l.Tstp = parseTime(line) },
-		regexp.MustCompile("atsfp (?P<D>.*);"):                 func(l *Lease, line string) { l.Atsfp = parseTime(line) },
-		regexp.MustCompile("cltt (?P<D>.*);"):                  func(l *Lease, line string) { l.Cltt = parseTime(line) },
-		regexp.MustCompile(`uid "(?P<D>.*)";`):                 func(l *Lease, line string) { l.UID = line },
-		regexp.MustCompile(`client-hostname "(?P<D>.*)";`):     func(l *Lease, line string) { l.ClientHostname = line },
-		regexp.MustCompile(`(?m)^\s*binding state (?P<D>.*);`): func(l *Lease, line string) { l.BindingState = line },
-		regexp.MustCompile("next binding state (?P<D>.*);"):    func(l *Lease, line string) { l.NextBindingState = line },
-		regexp.MustCompile("hardware (?P<D>.*);"): func(l *Lease, line string) {
+	stringDecoders = map[string]func(*Lease, string){
+		"lease ":                func(l *Lease, line string) { l.IP = net.ParseIP(parseKeyword(line, 1)) },
+		"cltt ":                 func(l *Lease, line string) { l.Cltt = parseTime(line) },
+		"starts ":               func(l *Lease, line string) { l.Starts = parseTime(line) },
+		"ends ":                 func(l *Lease, line string) { l.Ends = parseTime(line) },
+		"tsfp ":                 func(l *Lease, line string) { l.Tsfp = parseTime(line) },
+		"tstp ":                 func(l *Lease, line string) { l.Tstp = parseTime(line) },
+		"atsfp ":                func(l *Lease, line string) { l.Atsfp = parseTime(line) },
+		"uid ":                  func(l *Lease, line string) { l.UID = parseQuoted(line) },
+		"client-hostname ":      func(l *Lease, line string) { l.ClientHostname = parseQuoted(line) },
+		"binding state ":        func(l *Lease, line string) { l.BindingState = parseKeyword(line, 2) },
+		"next binding state ":   func(l *Lease, line string) { l.NextBindingState = parseKeyword(line, 3) },
+		"rewind binding state ": func(l *Lease, line string) { l.RewindBindingState = parseKeyword(line, 3) },
+		"hardware ": func(l *Lease, line string) {
 			s := strings.SplitN(line, " ", 2)
 			l.Hardware.Hardware = s[0]
 			l.Hardware.MAC = s[1]
@@ -95,13 +96,37 @@ var (
 				l.Hardware.MACAddr = m
 			}
 		},
+		// TODO?
+		"set ": func(l *Lease, line string) { /* set identifier = "value"; */ },
 	}
 )
 
 /*parseTime from the off format of "6 2019/04/27 03:34:45;" adn returns a time struct*/
 func parseTime(s string) time.Time {
-	t, _ := time.Parse("2006/01/02 15:04:05", s[2:])
+	s = strings.TrimRight(s, ";")
+
+	if strings.HasSuffix(s, " never") {
+		return time.Unix(1<<63-62135596801, 999999999)
+	}
+
+	s = strings.SplitN(s, " ", 3)[2]
+	t, _ := time.Parse("2006/01/02 15:04:05", s)
+
 	return t
+}
+
+func parseQuoted(s string) string {
+	s = strings.TrimRight(s, ";")
+	s = strings.SplitN(s, " ", 2)[1]
+	s = strings.Trim(s, "\"")
+
+	return s
+}
+
+func parseKeyword(s string, location int) string {
+	s = strings.TrimRight(s, ";")
+
+	return strings.Split(s, " ")[location]
 }
 
 /*parse takes a byte slice that looks like:
@@ -124,10 +149,11 @@ func (l *Lease) parse(s []byte) {
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
 		line := scanner.Text()
-		for re, fxn := range decoders {
-			if re.MatchString(line) {
-				s := re.FindStringSubmatch(line)
-				fxn(l, s[1])
+		line = strings.TrimLeft(line, " ")
+
+		for prefix, parser := range stringDecoders {
+			if strings.HasPrefix(line, prefix) {
+				parser(l, line)
 			}
 		}
 	}

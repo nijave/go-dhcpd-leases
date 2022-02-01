@@ -20,7 +20,7 @@ func Parse(r io.Reader) []Lease {
 			return 0, nil, fmt.Errorf("Unable to parse")
 		}
 		if i := bytes.Index(d, lkwd); i != -1 { //locate folloing }
-			i += 7
+			i += 1
 			if j := bytes.Index(d[i:], closeParen); j != -1 {
 				return i + j + 1, d[i : i+j+1], nil
 			}
