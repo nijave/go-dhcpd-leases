@@ -38,7 +38,7 @@ lease 172.24.43.4 {
 }
 
 func TestParse(t *testing.T) {
-	a := parseTime("6 2019/04/27 03:34:45")
+	a := parseTime("cltt 6 2019/04/27 03:34:45;")
 	ex := time.Date(2019, 4, 27, 3, 34, 45, 0, time.UTC)
 
 	if a.IsZero() {
