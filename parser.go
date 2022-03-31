@@ -28,6 +28,7 @@ func Parse(r io.Reader) []Lease {
 			inQuotes := false
 			// locate following "}"
 			for j := i; j < len(d); j++ {
+				// skip over escaped characters
 				if d[j] == '\\' && j+1 < len(d) && (d[j+1] == '"' || d[j+1] == '\\') {
 					j++
 					continue
@@ -36,13 +37,14 @@ func Parse(r io.Reader) []Lease {
 					inQuotes = !inQuotes
 					continue
 				}
-				if !inQuotes && bytes.Compare(d[j:j+len(leaseEndKeyword)], leaseEndKeyword) == 0 {
+
+				end := j + len(leaseEndKeyword)
+				if !inQuotes && end < len(d) && bytes.Compare(d[j:end], leaseEndKeyword) == 0 {
 					log.WithFields(log.Fields{"leaseEnd": j}).Trace("Found lease end")
 					return j + 1, d[i : j+1], nil
 				}
 			}
 		}
-		log.Trace("Lease end not found")
 		return 0, nil, nil
 	}
 
