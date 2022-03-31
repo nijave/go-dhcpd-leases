@@ -117,7 +117,7 @@ lease 172.16.0.66 {
   binding state active;
   next binding state free;
   rewind binding state free;
-  hardware ethernet 00:15:5d:00:e2:8c;
+  hardware ethernet 00:00:00:00:00:01;
   uid "\377\"\305\202\347\000\002\000\000\253\021A\015\020,J\275b\\";
   client-hostname "vmubt2004kube04";
 }
@@ -128,7 +128,7 @@ lease 172.16.0.24 {
   binding state active;
   next binding state free;
   rewind binding state free;
-  hardware ethernet 34:f6:4b:63:5c:45;
+  hardware ethernet 00:00:00:00:00:01;
   uid "\0014\366Kc\\E";
   set vendor-class-identifier = "MSFT 5.0";
   client-hostname "DESKTOP-2AFSHAA";

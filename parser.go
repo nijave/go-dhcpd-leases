@@ -22,11 +22,21 @@ func Parse(r io.Reader) []Lease {
 		if atEOF {
 			return 0, nil, fmt.Errorf("unable to parse")
 		}
-		if i := bytes.Index(d, leaseStartKeyword); i != -1 { // locate following "}"
+		if i := bytes.Index(d, leaseStartKeyword); i != -1 {
 			log.WithFields(log.Fields{"leaseBegin": i}).Trace("Found lease start")
 			i += 1
+			inQuotes := false
+			// locate following "}"
 			for j := i; j < len(d); j++ {
-				if bytes.Compare(d[j:j+len(leaseEndKeyword)], leaseEndKeyword) == 0 {
+				if d[j] == '\\' && j+1 < len(d) && (d[j+1] == '"' || d[j+1] == '\\') {
+					j++
+					continue
+				}
+				if d[j] == '"' {
+					inQuotes = !inQuotes
+					continue
+				}
+				if !inQuotes && bytes.Compare(d[j:j+len(leaseEndKeyword)], leaseEndKeyword) == 0 {
 					log.WithFields(log.Fields{"leaseEnd": j}).Trace("Found lease end")
 					return j + 1, d[i : j+1], nil
 				}
