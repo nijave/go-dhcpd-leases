@@ -10,7 +10,7 @@ import (
 
 var (
 	leaseStartKeyword = []byte("\nlease ")
-	leaseEndKeyword   = []byte("}")
+	leaseEndKeyword   = []byte{'\n', '}'}
 )
 
 /*
@@ -25,14 +25,8 @@ func Parse(r io.Reader) []Lease {
 		if i := bytes.Index(d, leaseStartKeyword); i != -1 { // locate following "}"
 			log.WithFields(log.Fields{"leaseBegin": i}).Trace("Found lease start")
 			i += 1
-			inQuotes := false
 			for j := i; j < len(d); j++ {
-				if d[j] == '"' {
-					inQuotes = !inQuotes
-					log.WithFields(log.Fields{"position": j, "inQuotes": inQuotes}).Trace("Found quotation mark")
-					continue
-				}
-				if !inQuotes && bytes.Compare(d[j:j+len(leaseEndKeyword)], leaseEndKeyword) == 0 {
+				if bytes.Compare(d[j:j+len(leaseEndKeyword)], leaseEndKeyword) == 0 {
 					log.WithFields(log.Fields{"leaseEnd": j}).Trace("Found lease end")
 					return j + 1, d[i : j+1], nil
 				}

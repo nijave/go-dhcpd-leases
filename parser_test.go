@@ -107,3 +107,53 @@ lease 172.16.0.219 {
 		}
 	}
 }
+
+func TestParseLeaseUidWithQuote(t *testing.T) {
+	leaseData := `
+lease 172.16.0.66 {
+  starts 4 2022/03/31 18:29:06;
+  ends 4 2022/03/31 22:29:06;
+  cltt 4 2022/03/31 18:29:06;
+  binding state active;
+  next binding state free;
+  rewind binding state free;
+  hardware ethernet 00:15:5d:00:e2:8c;
+  uid "\377\"\305\202\347\000\002\000\000\253\021A\015\020,J\275b\\";
+  client-hostname "vmubt2004kube04";
+}
+lease 172.16.0.24 {
+  starts 4 2022/03/31 18:30:16;
+  ends 4 2022/03/31 22:30:16;
+  cltt 4 2022/03/31 18:30:16;
+  binding state active;
+  next binding state free;
+  rewind binding state free;
+  hardware ethernet 34:f6:4b:63:5c:45;
+  uid "\0014\366Kc\\E";
+  set vendor-class-identifier = "MSFT 5.0";
+  client-hostname "DESKTOP-2AFSHAA";
+}
+`
+	want := [][]string{
+		{"172.16.0.66", "vmubt2004kube04"},
+		{"172.16.0.24", "DESKTOP-2AFSHAA"},
+	}
+
+	buf := bytes.NewBufferString(leaseData)
+
+	leases := Parse(buf)
+
+	if len(leases) != len(want) {
+		t.Errorf("found %d leases, expected %d", len(leases), len(want))
+		return
+	}
+
+	for i, data := range want {
+		if leases[i].IP.String() != data[0] {
+			t.Errorf("%v should have IP %s", leases[i], data[0])
+		}
+		if leases[i].ClientHostname != data[1] {
+			t.Errorf("%v should have hostname %s", leases[i], data[1])
+		}
+	}
+}

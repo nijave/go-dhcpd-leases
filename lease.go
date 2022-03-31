@@ -3,6 +3,7 @@ package leases
 import (
 	"bufio"
 	"bytes"
+	"encoding/hex"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"strings"
@@ -77,14 +78,32 @@ type Lease struct {
 
 var (
 	stringDecoders = map[string]func(*Lease, string){
-		"lease ":                func(l *Lease, line string) { l.IP = net.ParseIP(parseKeyword(line, 1)) },
-		"cltt ":                 func(l *Lease, line string) { l.Cltt = parseTime(line) },
-		"starts ":               func(l *Lease, line string) { l.Starts = parseTime(line) },
-		"ends ":                 func(l *Lease, line string) { l.Ends = parseTime(line) },
-		"tsfp ":                 func(l *Lease, line string) { l.Tsfp = parseTime(line) },
-		"tstp ":                 func(l *Lease, line string) { l.Tstp = parseTime(line) },
-		"atsfp ":                func(l *Lease, line string) { l.Atsfp = parseTime(line) },
-		"uid ":                  func(l *Lease, line string) { l.UID = parseQuoted(line) },
+		"lease ":  func(l *Lease, line string) { l.IP = net.ParseIP(parseKeyword(line, 1)) },
+		"cltt ":   func(l *Lease, line string) { l.Cltt = parseTime(line) },
+		"starts ": func(l *Lease, line string) { l.Starts = parseTime(line) },
+		"ends ":   func(l *Lease, line string) { l.Ends = parseTime(line) },
+		"tsfp ":   func(l *Lease, line string) { l.Tsfp = parseTime(line) },
+		"tstp ":   func(l *Lease, line string) { l.Tstp = parseTime(line) },
+		"atsfp ":  func(l *Lease, line string) { l.Atsfp = parseTime(line) },
+		"uid ": func(l *Lease, line string) {
+			if strings.HasPrefix(line, "uid \"") {
+				// TODO maybe octal representation should be unencoded before storing to string
+				l.UID = parseQuoted(line)
+			} else {
+				// Alternate form I think...
+
+				// The client identifier is recorded as a colon-separated hexadecimal
+				// list or as a quoted string. If it is recorded as a quoted string
+				// and it contains one or more non-printable characters, those
+				// characters are represented as octal escapes - a backslash character
+				// followed by three octal digits.
+				bytes, err := hex.DecodeString(strings.Replace(parseKeyword(line, 2), ":", "", -1))
+				if err != nil {
+					return
+				}
+				l.UID = string(bytes)
+			}
+		},
 		"client-hostname ":      func(l *Lease, line string) { l.ClientHostname = parseQuoted(line) },
 		"binding state ":        func(l *Lease, line string) { l.BindingState = parseKeyword(line, 2) },
 		"next binding state ":   func(l *Lease, line string) { l.NextBindingState = parseKeyword(line, 3) },
