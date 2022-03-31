@@ -3,6 +3,7 @@ package leases
 import (
 	"bufio"
 	"bytes"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"strings"
 	"time"
@@ -112,21 +113,25 @@ func parseTime(s string) time.Time {
 	s = strings.SplitN(s, " ", 3)[2]
 	t, _ := time.Parse("2006/01/02 15:04:05", s)
 
+	log.WithFields(log.Fields{"inputString": s, "time": t}).Trace("Parsed timestamp")
 	return t
 }
 
 func parseQuoted(s string) string {
-	s = strings.TrimRight(s, ";")
-	s = strings.SplitN(s, " ", 2)[1]
-	s = strings.Trim(s, "\"")
+	sParsed := strings.TrimRight(s, ";")
+	sParsed = strings.SplitN(sParsed, " ", 2)[1]
+	sParsed = strings.Trim(sParsed, "\"")
 
-	return s
+	log.WithFields(log.Fields{"inputString": s, "string": sParsed}).Trace("Parsed quoted string")
+	return sParsed
 }
 
 func parseKeyword(s string, location int) string {
-	s = strings.TrimRight(s, ";")
+	sParsed := strings.TrimRight(s, ";")
+	sParsed = strings.Split(sParsed, " ")[location]
 
-	return strings.Split(s, " ")[location]
+	log.WithFields(log.Fields{"inputString": s, "location": location, "string": sParsed}).Trace("Parsed keyword")
+	return sParsed
 }
 
 /*parse takes a byte slice that looks like:
@@ -144,6 +149,7 @@ func parseKeyword(s string, location int) string {
 And populates the value of l with the values recoded
 */
 func (l *Lease) parse(s []byte) {
+	log.WithField("leaseToken", s).Trace("Parsing lease token")
 	buf := bytes.NewBuffer(s)
 	scanner := bufio.NewScanner(buf)
 	scanner.Split(bufio.ScanLines)
@@ -153,6 +159,11 @@ func (l *Lease) parse(s []byte) {
 
 		for prefix, parser := range stringDecoders {
 			if strings.HasPrefix(line, prefix) {
+				log.WithFields(log.Fields{
+					"line":   line,
+					"parser": parser,
+					"lease":  l,
+				}).Trace("Decoding line")
 				parser(l, line)
 			}
 		}

@@ -50,3 +50,60 @@ func TestParse(t *testing.T) {
 		t.Error("Didnt parse time correctly")
 	}
 }
+
+func TestParseWithBrace(t *testing.T) {
+	leaseData := `
+lease 172.16.0.60 {
+  starts 4 2022/03/31 15:52:00;
+  ends 4 2022/03/31 19:52:00;
+  cltt 4 2022/03/31 15:52:00;
+  binding state active;
+  next binding state free;
+  rewind binding state free;
+  hardware ethernet 00:00:00:00:00:01;
+  uid "\001\000\356\275\264\276j";
+  set vendor-class-identifier = "android-dhcp-11";
+  client-hostname "m8";
+}
+lease 172.16.0.67 {
+  starts 4 2022/03/31 16:27:59;
+  ends 4 2022/03/31 20:27:59;
+  cltt 4 2022/03/31 16:27:59;
+  binding state active;
+  next binding state free;
+  rewind binding state free;
+  hardware ethernet 00:00:00:00:00:02;
+  uid "\377v_}\212\000\002\000\000\253\021A\015\020,J\275b\\";
+  client-hostname "vmubt2004kube01";
+}
+lease 172.16.0.219 {
+  starts 4 2022/03/31 16:28:20;
+  ends 4 2022/03/31 20:28:20;
+  cltt 4 2022/03/31 16:28:20;
+  binding state active;
+  next binding state free;
+  rewind binding state free;
+  hardware ethernet 00:00:00:00:00:03;
+  uid "\3777\374\020\210\000\002\000\000\253\021A\015\020,J\275b\\";
+  client-hostname "vmubt2004kube02";
+}
+`
+	want := [][]string{
+		{"172.16.0.60", "m8"},
+		{"172.16.0.67", "vmubt2004kube01"},
+		{"172.16.0.219", "vmubt2004kube02"},
+	}
+
+	buf := bytes.NewBufferString(leaseData)
+
+	leases := Parse(buf)
+
+	for i, data := range want {
+		if leases[i].IP.String() != data[0] {
+			t.Errorf("%v should have IP %s", leases[i], data[0])
+		}
+		if leases[i].ClientHostname != data[1] {
+			t.Errorf("%v should have hostname %s", leases[i], data[1])
+		}
+	}
+}
